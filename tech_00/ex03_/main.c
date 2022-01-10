@@ -6,15 +6,40 @@
 #include <avr/io.h>
 #include <avr/eeprom.h>
 #define SERIAL_8N1 0x06
-#define NULL 0
 
+void wait_x_cpu_clocks(int32_t cpu_clocks)
+{
+	while (cpu_clocks > 0)
+	{
+		cpu_clocks -= 3;
+	}
+}
+
+void custom_delay(uint32_t milli)
+{
+	//milli = 0,001s
+	milli = milli * 2000;
+	wait_x_cpu_clocks(milli - 5);
+}
+
+unsigned char EEPROM_read(unsigned int uiAddress)
+{
+	/* Wait for completion of previous write */
+	while (EECR & (1 << EEPE))
+		;
+	/* Set up address register */
+	EEAR = uiAddress;
+	/* Start eeprom read by writing EERE */
+	EECR |= (1 << EERE);
+	/* Return data from Data Register */
+	return EEDR;
+}
 
 void eeprom_read(const uint16_t offset, uint8_t* const data, const uint16_t len)
 {
 	for (uint16_t i = 0; i < len; i++)
 	{
-		data[i] = eeprom_read_byte(offset + i);
-		custom_delay(100);
+		data[i] = EEPROM_read(offset + i);
 	}
 }
 
@@ -22,12 +47,11 @@ void eeprom_write(const uint16_t offset, const uint8_t* data, const uint16_t len
 {
 	for (uint16_t i = 0; i < len; i++)
 	{
-		if (data[i] != eeprom_read_byte(offset + i))
+		if (data[i] != EEPROM_read(offset + i))
 		{
-			eeprom_write_byte(offset + i, data[i]);
 			// EEPROM_write(offset + i, data[i]);
+			eeprom_write_byte(offset + i, data[i]);
 		}
-		custom_delay(100);
 	}
 }
 
@@ -129,51 +153,97 @@ void get_string_uart(int print_char, char str[50], uint16_t max_len)
 }
 
 
+uint8_t get_data_at_addr(uint16_t addr)
+{
+	uint16_t *data = 0;
+	custom_delay(100);
+	eeprom_read(addr/8, (uint8_t*)data, 2);
+	custom_delay(100);
+	switch (addr % 8)
+	{
+		case 0:
+			return ((data[0] & 0b1110000000000000) >> 13);
+			break;
+		case 1:
+			return ((data[0] & 0b0111000000000000) >> 12);
+			break;
+		case 2:
+			return ((data[0] & 0b0011100000000000) >> 11);
+			break;
+		case 3:
+			return ((data[0] & 0b0001110000000000) >> 10);
+			break;
+		case 4:
+			return ((data[0] & 0b0000111000000000) >> 9);
+			break;
+		case 5:
+			return ((data[0] & 0b0000011100000000) >> 8);
+			break;
+		case 6:
+			return ((data[0] & 0b0000001110000000) >> 7);
+			break;
+		case 7:
+			return ((data[0] & 0b0000000111000000) >> 6);
+			break;
+	}
+	return (0);
+}
+
 void set_data_at_addr(uint8_t i, uint16_t addr)
 {
-	uint16_t *data;
+	uint16_t *data = 0;
+	custom_delay(100);
 	eeprom_read(addr/8, (uint8_t*)data, 2);
+	custom_delay(100);
 	switch (addr % 8)
 	{
 		case 0:
 			data[0] &= ~0b1110000000000000;
-			data[0] |= i & 0b1110000000000000;
+			data[0] |= ((uint16_t)i << 13) & 0b1110000000000000;
 			break;
 		case 1:
 			data[0] &= ~0b0111000000000000;
-			data[0] |= i & 0b0111000000000000;
+			data[0] |= ((uint16_t)i << 12) & 0b0111000000000000;
+			break;
 		case 2:
 			data[0] &= ~0b0011100000000000;
-			data[0] |= i & 0b0011100000000000;
+			data[0] |= ((uint16_t)i << 11) & 0b0011100000000000;
+			break;
 		case 3:
 			data[0] &= ~0b0001110000000000;
-			data[0] |= i & 0b0001110000000000;
+			data[0] |= ((uint16_t)i << 10) & 0b0001110000000000;
+			break;
 		case 4:
 			data[0] &= ~0b0000111000000000;
-			data[0] |= i & 0b0000111000000000;
+			data[0] |= ((uint16_t)i << 9) & 0b0000111000000000;
+			break;
 		case 5:
 			data[0] &= ~0b0000011100000000;
-			data[0] |= i & 0b0000011100000000;
+			data[0] |= ((uint16_t)i << 8) & 0b0000011100000000;
+			break;
 		case 6:
 			data[0] &= ~0b0000001110000000;
-			data[0] |= i & 0b0000001110000000;
+			data[0] |= ((uint16_t)i << 7) & 0b0000001110000000;
+			break;
 		case 7:
 			data[0] &= ~0b0000000111000000;
-			data[0] |= i & 0b0000000111000000;
+			data[0] |= ((uint16_t)i << 6) & 0b0000000111000000;
+			break;
 	}
+	custom_delay(100);
 	eeprom_write(addr/8, (uint8_t*)data, 2);
+	custom_delay(100);
 }
 
 
 #define HEADER_SIZE 20
-void get_ascii_uart(void)
+void write_ascii_uart(void)
 {
 	char c = '\0';
-	int i = 0;
 	char last_is_ret = 0;
 	char palet[7] = {0};
 	uint16_t current_index = 0;
-	uint8_t buffer[3] = {};
+	int i;
 
 	while (c != '\n')
 	{
@@ -192,7 +262,6 @@ void get_ascii_uart(void)
 		}
 		else if ((c >= 32 && c < 126))
 		{
-			int i;
 			for (i = 0; i < 7; i++)
 			{
 				if (palet[i] == c)
@@ -208,107 +277,68 @@ void get_ascii_uart(void)
 			if (i == 7)
 			{
 				//error
+				uart_printstr("ERROR\r\n\r\n");
+
 			}
+			uart_tx(c);
 			set_data_at_addr(i + HEADER_SIZE * 8, current_index);
 			current_index++;
 			last_is_ret = 0;
 		}
 	}
+	// current_index = 7;
+	custom_delay(100);
 	eeprom_write(0, (uint8_t*)palet, 7);
-	eeprom_write(0, (uint8_t*)current_index, 2);
-
+	custom_delay(100);
+	eeprom_write(8, (uint8_t*)&current_index, 2);
+	// uint8_t new_truc = 2;
+	// eeprom_write(8, (uint8_t*)new_truc, 1);
+	uart_printstr("End of write\r\n\r\n");
+	uart_printstr("size :");
+	uart_tx(current_index + '0');
+	uart_printstr("palet :");
+	uart_printstr(palet);
 
 }
 
-void print_ascii_uart()
+void read_ascii_uart()
 {
+	char palet[7] = {0};
+	uint16_t max_size = 0;
+	uint8_t new_truc = 0;
+	eeprom_read(0, (uint8_t*)palet, 7);
+	eeprom_read(8, (uint8_t*)&max_size, 1);
+	uint8_t c = 0;
+		uart_printstr("size :");
+	uart_tx(max_size + '0');
+	uart_printstr("palet :");
+	uart_printstr(palet);
+	// uart_tx(max_size + '0');
+	uart_printstr("\r\n");
 
+
+
+	for (uint16_t index = 0; index < max_size; index++)
+	{
+		c = get_data_at_addr(index * 3);
+		if (c == 7)
+		{
+			uart_printstr("\r\n");
+		}
+		else
+		{
+			uart_tx(palet[c]);
+		}
+	}
 }
 
-void wait_x_cpu_clocks(int32_t cpu_clocks)
-{
-	while (cpu_clocks > 0)
-	{
-		cpu_clocks -= 3;
-	}
-}
 
-void custom_delay(uint32_t milli)
-{
-	//milli = 0,001s
-	milli = milli * 2000;
-	wait_x_cpu_clocks(milli - 5);
-}
-
-uint8_t parse(char *command, uint8_t *output)
-{
-	*output = 0;
-	if (command[0] >= '0' && command[0] <= '9')
-	{
-		*output += (command[0] - '0') << 4;
-	}
-	else if (command[0] >= 'a' && command[0] <= 'f')
-	{
-		*output += (command[0] - 'a' + 10) << 4;
-	}
-	else if (command[0] >= 'F' && command[0] <= 'F')
-	{
-		*output += (command[0] - 'F' + 10) << 4;
-	}
-	else
-	{
-		return (1);
-	}
-	if (command[1] >= '0' && command[1] <= '9')
-	{
-		*output += (command[1] - '0') << 4;
-	}
-	else if (command[1] >= 'a' && command[1] <= 'f')
-	{
-		*output += (command[1] - 'a' + 10) << 4;
-	}
-	else if (command[1] >= 'F' && command[1] <= 'F')
-	{
-		*output += (command[1] - 'F' + 10) << 4;
-	}
-	else
-	{
-		return (1);
-	}
-	return (0);
-}
-
-uint8_t parse_color(char *command)
-{
-	if (command[0] != '#')
-		return (1);
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-	if (parse(command + 1, &r))
-	{
-		return (1);
-	}
-	if (parse(command + 3, &g))
-	{
-		return (1);
-	}
-	if (parse(command + 5, &b))
-	{
-		return (1);
-	}
-	OCR0A = 0xFF - r; //R
-	OCR0B = 0xFF - g; //G
-	OCR2B = 0xFF - b; //B
-	return (0);
-}
 
 int main()
 {
 	uart_init(115200, SERIAL_8N1);
 	char tmp_command[50];
 
-	uint8_t current_state = 0;
 	for (;;)
 	{
 		// uart_printstr("\033[1;36mVeuillez entrer votre ascii-art\r\n");
@@ -326,23 +356,39 @@ int main()
 		if (str_comp(tmp_command, "read") == 0)
 		{
 			uart_printstr("\033[1;34mRead \033[1;35m\r\n");
+			read_ascii_uart();
 		}
 		else if (str_comp(tmp_command, "write") == 0)
 		{
 			uart_printstr("\033[1;34mEntrez votre Ascii-Art\033[1;35m\r\n");
-			get_ascii_uart();
+			write_ascii_uart();
 		}
 		else if (str_comp(tmp_command, "edit") == 0)
 		{
 			uart_printstr("\033[1;34mEdit \033[1;35m\r\n");
 		}
+		else if (str_comp(tmp_command, "eeprom w") == 0)
+		{
+			uart_printstr("\033[1;34mEeprom write \033[1;35m\r\n");
+			uint16_t str[2] = {4,0};
+			eeprom_write(8, (uint8_t*)str, 2);
+
+		}
+		else if (str_comp(tmp_command, "eeprom r") == 0)
+		{
+			uart_printstr("\033[1;34mEeprom read \033[1;35m\r\n");
+			uint16_t str[3] = {0};
+			eeprom_read(8, (uint8_t*)str, 2);
+			uart_tx(str[0] + '0');
+			uart_printstr("\033[1;34m\r\n");
+
+		}
 		else 
 		{
 			uart_printstr("\033[1;34mCommande inconnue \033[1;35m\r\n\r\n");
 		}
-
-
-
+		custom_delay(500);
 
 	}
+	return (0);
 }
