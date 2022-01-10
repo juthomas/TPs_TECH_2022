@@ -177,10 +177,11 @@ void eeprom_write(const uint16_t offset, const uint8_t* data, const uint16_t len
 {
 	for (uint16_t i = 0; i < len; i++)
 	{
-		// if (data[i] != EEPROM_read(offset + i))
-		// {
-			EEPROM_write(offset + i, data[i]);
-		// }
+		if (data[i] != EEPROM_read(offset + i))
+		{
+			eeprom_write_byte(offset + i, data[i]);
+			// EEPROM_write(offset + i, data[i]);
+		}
 		custom_delay(100);
 	}
 }
