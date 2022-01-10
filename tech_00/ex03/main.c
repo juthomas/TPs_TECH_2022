@@ -3,31 +3,13 @@
 #define __AVR_ATmega328P__
 #define F_CPU 16000000
 #endif
-#include <avr/interrupt.h>
 #include <avr/io.h>
+#include <avr/eeprom.h>
 #include <stdlib.h>
 // #include <avr/iom328p.h>
 #define CPU_CLOCK 2000000 // 16Mhz -> / 8 2Mhz
 #define SERIAL_8N1 0x06
 #define NULL 0
-
-#define ISR(vector, ...)                                                 \
-	void vector(void) __attribute__((signal, __INTR_ATTRS)) __VA_ARGS__; \
-	void vector(void)
-
-typedef struct s_login
-{
-	const char *username;
-	const char *password;
-	const char *particules;
-} t_login;
-
-#define LOG_NUMBER 3
-
-static const t_login g_logs[LOG_NUMBER] = {
-	(t_login){.username = "juthomas", .password = "juju", .particules = "le grand"},
-	(t_login){.username = "jgourdin", .password = "jojo", .particules = "le magnifique"},
-	(t_login){.username = "Party-Boi", .password = "jojo", .particules = "la star de reddit"}};
 
 void wait_x_cpu_clocks(int32_t cpu_clocks)
 {
@@ -126,7 +108,6 @@ int str_comp(char *s1, char *s2)
 
 void EEPROM_write(unsigned int uiAddress, unsigned char ucData)
 {
-	cli();
 	/* Wait for completion of previous write */
 	while (EECR & (1 << EEPE))
 		;
@@ -137,12 +118,10 @@ void EEPROM_write(unsigned int uiAddress, unsigned char ucData)
 	EECR |= (1 << EEMPE);
 	/* Start eeprom write by setting EEPE */
 	EECR |= (1 << EEPE);
-	sei();
 }
 
 unsigned char EEPROM_read(unsigned int uiAddress)
 {
-	cli();
 	/* Wait for completion of previous write */
 	while (EECR & (1 << EEPE))
 		;
@@ -152,7 +131,6 @@ unsigned char EEPROM_read(unsigned int uiAddress)
 	EECR |= (1 << EERE);
 	/* Return data from Data Register */
 	return EEDR;
-	sei();
 }
 
 uint16_t str_len(char *str)
@@ -169,7 +147,6 @@ void eeprom_read(const uint16_t offset, uint8_t* const data, const uint16_t len)
 	for (uint16_t i = 0; i < len; i++)
 	{
 		data[i] = EEPROM_read(offset + i);
-		custom_delay(100);
 	}
 }
 
@@ -177,15 +154,15 @@ void eeprom_write(const uint16_t offset, const uint8_t* data, const uint16_t len
 {
 	for (uint16_t i = 0; i < len; i++)
 	{
-		// if (data[i] != EEPROM_read(offset + i))
-		// {
-			EEPROM_write(offset + i, data[i]);
-		// }
-		custom_delay(100);
+		if (data[i] != EEPROM_read(offset + i))
+		{
+			// EEPROM_write(offset + i, data[i]);
+			eeprom_write_byte(offset + i, data[i]);
+		}
 	}
 }
 
-void get_string_uart(int print_char, char str[50])
+void get_string_uart(int print_char, char *str, uint16_t max_len)
 {
 	char c = '\0';
 	int i = 0;
@@ -209,15 +186,16 @@ void get_string_uart(int print_char, char str[50])
 		else if ((c >= 32 && c < 126))
 		{
 			if (print_char == 1)
-			{
 				uart_tx(c);
-			}
 			else
-			{
 				uart_tx('*');
-			}
 			str[i] = c;
 			i++;
+			if (i > max_len)
+			{
+				uart_printstr("\r\n");
+				break ;
+			}
 		}
 	}
 	str[i] = '\0';
@@ -229,76 +207,32 @@ int main()
 	char tmp_command[50];
 	char tmp_output[1024];
 
-	custom_delay(2000);
+	custom_delay(500);
 	for (;;)
 	{
 		uart_printstr("\033[1;36mBonjour ! Voulez-vous ecrire ou lire l'EEPROM ? "
 					  "(\033[1;35mread\033[1;36m/\033[1;35mwrite\033[1;36m) : \r\n");
 		uart_printstr("\033[1;34m$> \033[1;35m");
-		get_string_uart(1, tmp_command);
-		custom_delay(500);
-
-		uart_printstr("\033[1;34mcommand: \033[1;35m");
-		uart_printstr(tmp_command);
-		// get_string_uart(0, tmp_password);
-		uart_printstr("\033[1;36m\r\n");
+		get_string_uart(1, tmp_command, 50);
 		if (str_comp(tmp_command, "read") == 0)
 		{
-			uart_printstr("\033[1;36mLa commande est un read\r\n");
-			eeprom_read(0, tmp_output, 10);
+			eeprom_read(0, tmp_output, 1024);
 			uart_printstr("\033[1;34mData: \033[1;35m");
-			tmp_output[10] = 0;
 			uart_printstr(tmp_output);
+			uart_printstr("\033[1;36m\r\n\r\n");
 		}
 		else if (str_comp(tmp_command, "write") == 0)
 		{
-			uart_printstr("\033[1;36mEntrez la (meta) data\r\n");
+			uart_printstr("\033[1;36mEntrez la (meta) data:\r\n");
 			uart_printstr("\033[1;34m$> \033[1;35m");
-			get_string_uart(1, tmp_output);
+			get_string_uart(1, tmp_output, 1022);
 			
-			uart_printstr("\033[1;34mData: \033[1;35m");
-			uart_printstr(tmp_output);
 			uart_printstr("\033[1;36m\r\n");
 			eeprom_write(0, tmp_output, str_len(tmp_output) + 1);
 		}
 		else
 		{
-			uart_printstr("\033[1;36mCommande inconnue\r\n");
-			EEPROM_write(0, '4');
-			custom_delay(500);
-			itoa(EEPROM_read(0), tmp_output, 10);
-			// tmp_output[1] = 0;
-			uart_printstr("\033[1;34mData: \033[1;35m");
-			uart_printstr(tmp_output);
-			uart_printstr("\033[1;36m\r\n");
+			uart_printstr("\033[1;36mCommande inconnue\r\n\r\n");
 		}
-
-		// int current_log = 0;
-		// int success = 0;
-		// while (current_log < LOG_NUMBER)
-		// {
-		// 	if ((str_comp(tmp_username, g_logs[current_log].username) == 0)
-		// 		&& (str_comp(tmp_password, g_logs[current_log].password) == 0))
-		// 	{
-		// 		success = current_log + 1;
-		// 	}
-		// 	current_log++;
-		// }
-
-		// if (success >= 1)
-		// {
-		// 	uart_printstr("\033[1;32mCC chef ");
-		// 	uart_printstr(g_logs[success-1].username);
-		// 	uart_printstr(" ");
-		// 	uart_printstr(g_logs[success-1].particules);
-		// 	uart_printstr("\033[1;36m\r\n");
-		// 	blink_success();
-		// }
-		// else
-		// {
-		// 	uart_printstr("\033[1;31mPtdr t ki?\033[1;37m\r\n");
-		// 	blink_failure();
-		// }
-		// uart_printstr("\r\n");
 	}
 }
