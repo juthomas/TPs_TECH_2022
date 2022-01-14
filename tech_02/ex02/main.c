@@ -191,6 +191,32 @@ void setup_adc()
 	ADCSRA=(1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);     // Enable ADC also set Prescaler as 128
 }
 
+
+void draw_cursor(uint8_t input, uint8_t len)
+{
+	uart_tx('[');
+	for (uint8_t i = 0; i < len; i++)
+	{
+		if ((((uint16_t)input * len) / 0xFF) <= i)
+			uart_tx(' ');
+		else
+			uart_tx('*');
+
+	}
+	uart_tx(']');
+
+	// uart_tx(tmp_a + 'A' - 10);
+}
+
+void remove_cursor(uint8_t len)
+{
+	uart_printstr("\033[1D\033[K\033[1D\033[K");
+	while(len--)
+	{
+		uart_printstr("\033[1D\033[K");
+	}
+}
+
 int main()
 {
 	uart_init(115200, SERIAL_8N1);
@@ -216,7 +242,9 @@ int main()
 	uint8_t current_state = 0;
 	uint8_t tmp_last_adc = 0;
 	uint8_t tmp_current_adc = 0;
-	uart_printstr("\033[1;36mValeur de ADC4 (PD4) : \033[1;35m0x00");
+	uart_printstr("\033[1;36mSalut a toi jeune developpeur !\r\n\r\n");
+	uart_printstr("\033[1;36mValeur de ADC4 (PD4) : \033[1;35m0x00 ");
+	draw_cursor(0, 10);
 
 	for (;;)
 	{
@@ -224,8 +252,11 @@ int main()
 		tmp_current_adc = analog_read_adc4();
 		if (tmp_last_adc != tmp_current_adc)
 		{
-			uart_printstr("\033[1D\033[K\033[1D\033[K");
+			remove_cursor(10);
+			uart_printstr("\033[1D\033[K\033[1D\033[K\033[1D\033[K");
 			write_exa_number(analog_read_adc4());
+			uart_printstr(" ");
+			draw_cursor(analog_read_adc4(), 10);
 			tmp_last_adc = tmp_current_adc;
 		}
 		custom_delay(50);
