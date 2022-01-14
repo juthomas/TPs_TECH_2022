@@ -120,69 +120,6 @@ void custom_delay(uint32_t milli)
 	wait_x_cpu_clocks(milli - 5);
 }
 
-uint8_t parse(char *command, uint8_t *output)
-{
-	*output = 0;
-	if (command[0] >= '0' && command[0] <= '9')
-	{
-		*output += (command[0] - '0') << 4;
-	}
-	else if (command[0] >= 'a' && command[0] <= 'f')
-	{
-		*output += (command[0] - 'a' + 10) << 4;
-	}
-	else if (command[0] >= 'F' && command[0] <= 'F')
-	{
-		*output += (command[0] - 'F' + 10) << 4;
-	}
-	else
-	{
-		return (1);
-	}
-	if (command[1] >= '0' && command[1] <= '9')
-	{
-		*output += (command[1] - '0') << 4;
-	}
-	else if (command[1] >= 'a' && command[1] <= 'f')
-	{
-		*output += (command[1] - 'a' + 10) << 4;
-	}
-	else if (command[1] >= 'F' && command[1] <= 'F')
-	{
-		*output += (command[1] - 'F' + 10) << 4;
-	}
-	else
-	{
-		return (1);
-	}
-	return (0);
-}
-
-uint8_t parse_color(char *command)
-{
-	if (command[0] != '#')
-		return (1);
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-	if (parse(command + 1, &r))
-	{
-		return (1);
-	}
-	if (parse(command + 3, &g))
-	{
-		return (1);
-	}
-	if (parse(command + 5, &b))
-	{
-		return (1);
-	}
-	OCR0A = 0xFF - r; //R
-	OCR0B = 0xFF - g; //G
-	OCR2B = 0xFF - b; //B
-	return (0);
-}
-
 uint8_t analog_read_adc4()
 {
 	//  REF1  REF0 :
@@ -276,8 +213,6 @@ int main()
 	setup_adc();
 	custom_delay(1000);
 
-
-
 	uint8_t current_state = 0;
 	uint8_t tmp_last_adc = 0;
 	uint8_t tmp_current_adc = 0;
@@ -293,22 +228,6 @@ int main()
 			write_exa_number(analog_read_adc4());
 			tmp_last_adc = tmp_current_adc;
 		}
-		// uart_printstr("\r\n");
 		custom_delay(50);
-		// uart_printstr("\033[1;36mVeuillez entrer une couleur en hexadecimal "
-		// 			  "(\033[1;35m#XXXXXX\033[1;36m) : \r\n");
-		// uart_printstr("\033[1;34m$> \033[1;35m");
-		// get_string_uart(1, tmp_command, 50);
-		// custom_delay(500);
-
-		// uart_printstr("\033[1;34mcommand: \033[1;35m");
-		// uart_printstr(tmp_command);
-		// // get_string_uart(0, tmp_password);
-		// uart_printstr("\033[1;36m\r\n");
-
-		// if (parse_color(tmp_command))
-		// {
-		// 	uart_printstr("\033[1;34mError \033[1;35m\r\n");
-		// }
 	}
 }
