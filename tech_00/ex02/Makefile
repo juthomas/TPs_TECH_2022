@@ -20,6 +20,10 @@ hex:
 
 flash:
 	avrdude -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -b $(BAUD) -U flash:w:$(FILENAME).hex:i
+	@echo "Msg dans eeprom"
+
+	# avrdude -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -b $(BAUD) -U eeprom:w:eeprom.hex:r
+	avrdude -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT)  -U eeprom:w:0xff:m
 
 clean:
 	rm -f $(FILENAME).o
