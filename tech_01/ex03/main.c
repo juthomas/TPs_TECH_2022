@@ -141,21 +141,33 @@ uint8_t parse(char *command, uint8_t *output)
 	}
 	if (command[1] >= '0' && command[1] <= '9')
 	{
-		*output += (command[1] - '0') << 4;
+		*output += (command[1] - '0');
 	}
 	else if (command[1] >= 'a' && command[1] <= 'f')
 	{
-		*output += (command[1] - 'a' + 10) << 4;
+		*output += (command[1] - 'a' + 10);
 	}
 	else if (command[1] >= 'F' && command[1] <= 'F')
 	{
-		*output += (command[1] - 'F' + 10) << 4;
+		*output += (command[1] - 'F' + 10);
 	}
 	else
 	{
 		return (1);
 	}
 	return (0);
+}
+
+void	uart_print_int(uint8_t n) {
+	char s[4] = {0};
+
+	int size = 3;
+	while (size--)
+	{
+		s[size] = n >= 0 ? '0' + n % 10 : '0' - n % 10;
+		n /= 10;
+	}
+	uart_printstr(s);
 }
 
 uint8_t parse_color(char *command)
@@ -180,6 +192,15 @@ uint8_t parse_color(char *command)
 	OCR0A = 0xFF - r; //R
 	OCR0B = 0xFF - g; //G
 	OCR2B = 0xFF - b; //B
+
+	uart_printstr("\e[48;2;");
+	uart_print_int(r);
+	uart_tx(';');
+	uart_print_int(g);
+	uart_tx(';');
+	uart_print_int(b);
+	uart_printstr("m \e[0m");
+
 	return (0);
 }
 
@@ -212,14 +233,20 @@ int main()
 		get_string_uart(1, tmp_command, 50);
 		custom_delay(500);
 
-		uart_printstr("\033[1;34mcommand: \033[1;35m");
-		uart_printstr(tmp_command);
+		// uart_printstr("\033[1;34mcommand: \033[1;35m");
+		// uart_printstr(tmp_command);
 		// get_string_uart(0, tmp_password);
 		uart_printstr("\033[1;36m\r\n");
 
 		if (parse_color(tmp_command))
 		{
 			uart_printstr("\033[1;34mError \033[1;35m\r\n");
+		}
+		else
+		{
+			uart_printstr(" \e[1;35m");
+			uart_printstr(tmp_command);
+			uart_printstr("\e[0m\r\n");
 		}
 	}
 }
