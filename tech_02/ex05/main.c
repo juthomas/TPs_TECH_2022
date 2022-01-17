@@ -217,11 +217,26 @@ void remove_cursor(uint8_t len)
 	}
 }
 
+void draw_progression_to_leds(uint8_t progression)
+{
+	PORTB &= ~0b00001111;
+	if (progression >= 0b00111111)
+		PORTB |= 1 << 3;
+	if (progression >= 0b01111111)
+		PORTB |= 1 << 2;
+	if (progression >= 0b10111111)
+		PORTB |= 1 << 1;
+	if (progression >= 0b11111111)
+		PORTB |= 1 << 0;
+		
+}
+
 int main()
 {
 	uart_init(115200, SERIAL_8N1);
 	char tmp_command[50];
 	DDRD |= 0b01101000;
+	DDRB |= 0b00001111;
 
 	TCCR0A |= (1 << COM0A1) | (1 << WGM00) | (1 << WGM01);
 	TCCR0B |= (1 << CS10);
@@ -257,12 +272,15 @@ int main()
 		{
 		case 0:
 			OCR0A = analog_read_adc4();
+			draw_progression_to_leds(0xFF - OCR0A);
 			break;
 		case 1:
 			OCR0B = analog_read_adc4();
+			draw_progression_to_leds(0xFF - OCR0B);
 			break;
 		case 2:
 			OCR2B = analog_read_adc4();
+			draw_progression_to_leds(0xFF - OCR2B);
 			break;
 		}
 		tmp_current_adc = analog_read_adc4();
