@@ -55,7 +55,6 @@ int str_comp(char *s1, char *s2)
 	return (*s1 - *s2);
 }
 
-
 void uart_printstr(const char *str)
 {
 	while (*str)
@@ -104,7 +103,6 @@ void get_string_uart(int print_char, char str[50], uint16_t max_len)
 	str[i] = '\0';
 }
 
-
 void wait_x_cpu_clocks(int32_t cpu_clocks)
 {
 	while (cpu_clocks > 0)
@@ -123,14 +121,14 @@ void custom_delay(uint32_t milli)
 uint8_t analog_read_adc4()
 {
 	//  REF1  REF0 :
-	//  0     0      = AREF, Internal Vref turned off 
-	//  0     1      = AVcc with external capacitor at AREF pin 
+	//  0     0      = AREF, Internal Vref turned off
+	//  0     1      = AVcc with external capacitor at AREF pin
 	//  1     0      = Reserved
-	//  1     1      = Internal 2.56 Voltage Reference with external capacitor at AREF Pin 
+	//  1     1      = Internal 2.56 Voltage Reference with external capacitor at AREF Pin
 
 	//  ADLAR:
-	//  0 = Right adjust the result 
-	//  1 = Left adjust the result 
+	//  0 = Right adjust the result
+	//  1 = Left adjust the result
 
 	//  MUX4  MUX3  MUX2  MUX1  MUX0 :
 	//  0     0     0     0     0      = ADC0
@@ -148,22 +146,23 @@ uint8_t analog_read_adc4()
 	//**                     Setup ADC                     **//
 	//        ADLAR
 	//          |
-    //     REFS1|
+	//     REFS1|
 	//        | |
 	ADMUX = 0b01000100;
 	//		   | |___|
 	//         |     |
 	//		   |  MUX4-MUX0
 	//	     REFS0
-	
+
 	//**                Start the convertion               **//
-	ADCSRA |= (1<<ADSC);
+	ADCSRA |= (1 << ADSC);
 
 	//**         Wait until the convertion is completed    **//
-	while (!(ADCSRA & (1<<ADIF)));
+	while (!(ADCSRA & (1 << ADIF)))
+		;
 
 	//**                 Stop the convertion               **//
-	ADCSRA |= (1<<ADIF);
+	ADCSRA |= (1 << ADIF);
 
 	//** Get the ADC value and moving from 10bits to 8bits **//
 	return (ADC >> 2);
@@ -181,7 +180,7 @@ void write_exa_number(uint8_t nu)
 		uart_tx(tmp_b + '0');
 	else
 		uart_tx(tmp_b + 'A' - 10);
-	
+
 	if (tmp_a < 0xA)
 		uart_tx(tmp_a + '0');
 	else
@@ -190,10 +189,9 @@ void write_exa_number(uint8_t nu)
 
 void setup_adc()
 {
-	ADMUX=(1<<REFS0);      // Selecting internal reference voltage
-	ADCSRA=(1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);     // Enable ADC also set Prescaler as 128
+	ADMUX = (1 << REFS0);											   // Selecting internal reference voltage
+	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Enable ADC also set Prescaler as 128
 }
-
 
 void draw_cursor(uint8_t input, uint8_t len)
 {
@@ -204,7 +202,6 @@ void draw_cursor(uint8_t input, uint8_t len)
 			uart_tx(' ');
 		else
 			uart_tx('#');
-
 	}
 	uart_tx(']');
 
@@ -214,7 +211,7 @@ void draw_cursor(uint8_t input, uint8_t len)
 void remove_cursor(uint8_t len)
 {
 	uart_printstr("\033[1D\033[K\033[1D\033[K");
-	while(len--)
+	while (len--)
 	{
 		uart_printstr("\033[1D\033[K");
 	}
@@ -239,6 +236,10 @@ int main()
 	OCR0B = 0xFF; //G
 	OCR2B = 0xFF; //B
 
+	uint8_t old_OCR0A = 0xFF;
+	uint8_t old_OCR0B = 0xFF;
+	uint8_t old_OCR2B = 0xFF;
+
 	setup_adc();
 	custom_delay(1000);
 
@@ -246,21 +247,42 @@ int main()
 	uint8_t tmp_last_adc = 0;
 	uint8_t tmp_current_adc = 0;
 	uart_printstr("\033[1;36mSalut a toi jeune developpeur !\r\n\r\n");
-	uart_printstr("\033[1;36mValeur de ADC4 (PD4) : \033[1;35m0x00  ");
-	draw_cursor(0, 20);
+	uart_printstr("\033[1;36mValeur de la couleur de la led : \033[1;35m0x000000  ");
+	// draw_cursor(0, 20);
 
 	for (;;)
 	{
 
-		tmp_current_adc = analog_read_adc4();
-		if (tmp_last_adc != tmp_current_adc)
+		switch (current_state)
 		{
-			remove_cursor(20);
-			uart_printstr("\033[1D\033[K\033[1D\033[K\033[1D\033[K\033[1D\033[K");
-			write_exa_number(analog_read_adc4());
-			uart_printstr("  ");
-			draw_cursor(analog_read_adc4(), 20);
-			tmp_last_adc = tmp_current_adc;
+		case 0:
+			OCR0A = analog_read_adc4();
+			break;
+		case 1:
+			OCR0B = analog_read_adc4();
+			break;
+		case 2:
+			OCR2B = analog_read_adc4();
+			break;
+		}
+		tmp_current_adc = analog_read_adc4();
+		if (OCR0A != old_OCR0A || OCR0B != old_OCR0B || OCR2B != old_OCR2B)
+		{
+			remove_cursor(6);
+			uart_printstr("0x");
+			write_exa_number(0xFF - OCR0A);
+			write_exa_number(0xFF - OCR0B);
+			write_exa_number(0xFF - OCR2B);
+			old_OCR0A = OCR0A;
+			old_OCR0B = OCR0B;
+			old_OCR2B = OCR2B;
+		}
+		if (!(PIND & 0b00000100))
+		{
+			while (!(PIND & 0b00000100))
+				;
+			custom_delay(50);
+			current_state = current_state < 2 ? current_state + 1 : 0;
 		}
 		custom_delay(50);
 	}

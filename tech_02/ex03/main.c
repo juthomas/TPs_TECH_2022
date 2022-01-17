@@ -120,7 +120,7 @@ void custom_delay(uint32_t milli)
 	wait_x_cpu_clocks(milli - 5);
 }
 
-uint8_t analog_read_adc4()
+uint8_t read_temp()
 {
 	//  REF1  REF0 :
 	//  0     0      = AREF, Internal Vref turned off 
@@ -150,7 +150,7 @@ uint8_t analog_read_adc4()
 	//          |
     //     REFS1|
 	//        | |
-	ADMUX = 0b01000100;
+	ADMUX = 0b11001000;
 	//		   | |___|
 	//         |     |
 	//		   |  MUX4-MUX0
@@ -166,7 +166,7 @@ uint8_t analog_read_adc4()
 	ADCSRA |= (1<<ADIF);
 
 	//** Get the ADC value and moving from 10bits to 8bits **//
-	return (ADC >> 2);
+	return ((ADC - 314) / 1.22);
 }
 
 void write_exa_number(uint8_t nu)
@@ -220,6 +220,18 @@ void remove_cursor(uint8_t len)
 	}
 }
 
+void	uart_print_int(uint8_t n) {
+	char s[4] = {0};
+
+	int size = 2;
+	while (size--)
+	{
+		s[size] = n >= 0 ? '0' + n % 10 : '0' - n % 10;
+		n /= 10;
+	}
+	uart_printstr(s);
+}
+
 int main()
 {
 	uart_init(115200, SERIAL_8N1);
@@ -246,20 +258,18 @@ int main()
 	uint8_t tmp_last_adc = 0;
 	uint8_t tmp_current_adc = 0;
 	uart_printstr("\033[1;36mSalut a toi jeune developpeur !\r\n\r\n");
-	uart_printstr("\033[1;36mValeur de ADC4 (PD4) : \033[1;35m0x00  ");
-	draw_cursor(0, 20);
+	uart_printstr("\033[1;36mValeur du capteur interne : \033[1;35m00°C");
+	// draw_cursor(0, 20);
 
 	for (;;)
 	{
 
-		tmp_current_adc = analog_read_adc4();
+		tmp_current_adc = read_temp();
 		if (tmp_last_adc != tmp_current_adc)
 		{
-			remove_cursor(20);
 			uart_printstr("\033[1D\033[K\033[1D\033[K\033[1D\033[K\033[1D\033[K");
-			write_exa_number(analog_read_adc4());
-			uart_printstr("  ");
-			draw_cursor(analog_read_adc4(), 20);
+			uart_print_int(read_temp());
+			uart_printstr("°C");
 			tmp_last_adc = tmp_current_adc;
 		}
 		custom_delay(50);
